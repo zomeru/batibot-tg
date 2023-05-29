@@ -35,14 +35,6 @@ export const chatCompletion = async (user: User, prompt: string) => {
     .order('created_at', { ascending: false })
     .limit(10);
 
-  // Save message to database
-  await supabase.from('messages').insert([
-    {
-      user: user.id,
-      message: prompt,
-    },
-  ]);
-
   // Format recent messages
   let formattedMessages = '';
   if (messages && messages.length > 0) {

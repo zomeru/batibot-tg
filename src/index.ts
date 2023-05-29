@@ -1,10 +1,10 @@
 import express from 'express';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
-import axios from 'axios';
 import morgan from 'morgan';
 
 import initWebRoute from './routes/web.route';
+import { useFetch } from './utils';
 import {
   TELEGRAM_API,
   WEBHOOK_URL,
@@ -22,10 +22,10 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 // init telegram webhook
 const init = async () => {
-  const response = await axios.get(
-    `${TELEGRAM_API}/setWebhook?url=${WEBHOOK_URL}`
-  );
-  console.log(response.data);
+  const data = await useFetch(`${TELEGRAM_API}/setWebhook?url=${WEBHOOK_URL}`, {
+    method: 'GET',
+  });
+  console.log('webhook', data);
 };
 
 // init web routes
