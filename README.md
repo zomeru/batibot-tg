@@ -1,6 +1,6 @@
 # Batibot-TG
 
-ChatGpt in your telegram app!
+ChatGpt in your telegram app! It supports conversation history, Batibot can respond based on your recent messages.
 
 ## 🛠 Set Up
 
