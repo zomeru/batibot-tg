@@ -8,6 +8,9 @@ type User = {
 };
 
 export const chatCompletion = async (user: User, prompt: string) => {
+  const zomerInfo =
+    'Zomer is a Software Engineer based in the Philippines and the creator of this bot. You can check out his website at https://zomeru.com.';
+
   // Check if user exists in database
   const { data: currentUser } = await supabase
     .from('users')
@@ -57,7 +60,7 @@ export const chatCompletion = async (user: User, prompt: string) => {
         role: 'system',
         content: `Respond to the user's messages as best, accurately, convincingly, and as human-like as you can, keep it short and straight to the point. Maximum of 5 sentences. You can also add bullets and numbers in a list in addition to the 5 sentences, but add then only if the user asks for it. You can try to call their name sometimes if you want, here's the user's name: ${
           user.firstName || user.username
-        }.${
+        }. Also, if they ask if you know or who Zomer, Zomer Gregorio, or zomeru is (that's me by the way, who created this bot (Batibot, name of the bot)), you can try to respond this message instead: "${zomerInfo}", you can try to add your own response in addition to that.${
           formattedMessages &&
           ` Also, you can try to make your answer based on the user's recent messages and your response (as an assistant) to those recent messages (conversation history), if they did not get the answer they want and they ask again. Here are the 10 recent messages of the user, the most recent is always number 1:\n\n${formattedMessages}`
         }`,
