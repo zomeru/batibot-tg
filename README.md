@@ -33,7 +33,7 @@ ChatGpt in your telegram app!
 5. Start a tunnel using ngrok
 
    ```
-   ngrok http 8080
+   ngrok http 8000
    ```
 
 6. Create a `.env` file
