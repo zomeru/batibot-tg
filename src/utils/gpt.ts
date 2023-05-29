@@ -30,13 +30,13 @@ export const chatCompletion = async (user: User, prompt: string) => {
     ]);
   }
 
-  // Get 10 most recent messages and assistant_response from user
+  // Get 20 most recent messages and assistant_response from user
   const { data: messages } = await supabase
     .from('messages')
     .select('message,assistant_response')
     .eq('user', user.id)
     .order('created_at', { ascending: false })
-    .limit(10);
+    .limit(20);
 
   // Format recent messages
   let formattedMessages = '';
@@ -62,7 +62,7 @@ export const chatCompletion = async (user: User, prompt: string) => {
           user.firstName || user.username
         }. Also, if they ask if you know or who Zomer, Zomer Gregorio, or zomeru is (that's me by the way, who created this bot (Batibot, name of the bot)), you can try to respond this message instead: "${zomerInfo}", you can try to add your own response in addition to that.${
           formattedMessages
-            ? ` Also, you can try to make your answer based on the user's recent messages and your response (as an assistant) to those recent messages (conversation history), if they did not get the answer they want and they ask again. Here are the 10 recent messages of the user, the most recent is always number 1:\n\n${formattedMessages}`
+            ? ` Also, you can try to make your answer based on the user's recent messages and your response (as an assistant) to those recent messages (conversation history), if they did not get the answer they want and they ask again. Here are the 20 recent messages of the user, the most recent is always number 1:\n\n${formattedMessages}`
             : ''
         }`,
       },
