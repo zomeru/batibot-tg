@@ -7,10 +7,6 @@ export const webhook = async (req: Request, res: Response) => {
   const userId = req.body?.message?.from?.id;
   const message = req.body?.message?.text;
 
-  console.log({
-    body: req.body,
-  });
-
   const sendMessageURL = `${TELEGRAM_API}/sendMessage`;
 
   if (message) {
