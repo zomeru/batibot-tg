@@ -6,18 +6,15 @@ import { chatCompletion } from '../utils/gpt';
 
 export const webhook = async (req: Request, res: Response) => {
   const userId = req.body.message.from.id;
-  const firstName = req.body.message.from.first_name;
-  const lastName = req.body.message.from.last_name;
-  const username = req.body.message.from.username;
   const message = req.body.message.text;
 
   if (message) {
     const gptResponse = await chatCompletion(
       {
         id: userId,
-        username,
-        firstName,
-        lastName,
+        username: req.body.message.from.username,
+        firstName: req.body.message.from.first_name,
+        lastName: req.body.message.from.last_name,
       },
       message
     );
