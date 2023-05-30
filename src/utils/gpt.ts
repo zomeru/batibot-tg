@@ -1,54 +1,90 @@
-import { supabase, openai } from '../configs';
+import { openai } from '../configs';
+import {
+  getUser,
+  createUser,
+  getUserRecentPrompts,
+  saveUserPrompt,
+} from '../services/supabase';
+import {
+  chatCompletionSystemContent,
+  promptTypeGPTSystemContent,
+  defaultGPTResponse,
+  imageGenerationPrompt,
+} from '../constants/gpt';
+import type {
+  User,
+  DeterminePromptType,
+  GPTCreateChatCompletionParams,
+} from '../types';
 
-type User = {
-  id: number;
-  username: string;
-  firstName?: string;
-  lastName?: string;
-};
-
-export const chatCompletion = async (user: User, prompt: string) => {
-  const otherInfo =
-    'Skilled in React, Node, TypeScript and other web technologies. You can check out his website at https://zomeru.com.';
-
-  const zomerInfo = `Zomer is a Software Engineer based in the Philippines and the creator of this bot. ${otherInfo}`;
-
-  const hannahInfo = `Hannah is the girlfriend of creator of this bot (Zomer), Zomer is a Software Engineer based in the Philippines. ${otherInfo}`;
-
-  // Check if user exists in database
-  const { data: currentUser } = await supabase
-    .from('users')
-    .select('tg_user_id')
-    .eq('tg_user_id', user.id)
-    .single();
-
-  // If user doesn't exist, create user
-  if (!currentUser) {
-    await supabase.from('users').insert([
+const gptCreateChatCompletion = async ({
+  userPrompt,
+  systemContent,
+}: GPTCreateChatCompletionParams) => {
+  const response = await openai.createChatCompletion({
+    model: 'gpt-3.5-turbo',
+    messages: [
       {
-        tg_user_id: user.id,
-        username: user.username,
-        first_name: user.firstName || '',
-        last_name: user.lastName || '',
+        role: 'system',
+        content: systemContent,
       },
-    ]);
+      {
+        role: 'user',
+        content: userPrompt,
+      },
+    ],
+  });
+
+  if (
+    response.data.choices.length <= 0 ||
+    !response.data.choices[0]?.message?.content
+  ) {
+    return null;
   }
 
+  return response?.data?.choices[0]?.message?.content;
+};
+
+export const determineUserPrompt = async (
+  prompt: string
+): Promise<DeterminePromptType> => {
+  const userPromptType = await gptCreateChatCompletion({
+    userPrompt: prompt,
+    systemContent: promptTypeGPTSystemContent,
+  });
+
+  if (!userPromptType) return 'SYSTEM_ERROR';
+
+  return userPromptType as DeterminePromptType;
+};
+
+export const findOrCreateUserAndGetRecentMessages = async (
+  user: User,
+  numberOfRecentMessages?: number
+) => {
+  // Check if user exists in database
+  const [currentUser] = await getUser(user.id);
+
+  // If user doesn't exist, create user
+  if (!currentUser) await createUser(user);
+
   // Get 20 most recent messages and assistant_response from user
-  const { data: messages } = await supabase
-    .from('messages')
-    .select('message,assistant_response')
-    .eq('user', user.id)
-    .order('created_at', { ascending: false })
-    .limit(20);
+  const [recentMessages] = await getUserRecentPrompts(
+    user.id,
+    numberOfRecentMessages
+  );
 
   // Format recent messages
   let formattedMessages = '';
-  if (messages && messages.length > 0) {
+  if (
+    recentMessages &&
+    Array.isArray(recentMessages) &&
+    recentMessages.length > 0
+  ) {
     // 1.
     // User prompt: "What is your name?"
     // Assistant response: "My name is John Doe."
-    formattedMessages = messages
+    formattedMessages = recentMessages
       .map((recent, index) => {
         return `${index + 1}.\n User prompt: "${
           recent.message
@@ -57,50 +93,63 @@ export const chatCompletion = async (user: User, prompt: string) => {
       .join('\n');
   }
 
-  const response = await openai.createChatCompletion({
-    model: 'gpt-3.5-turbo',
-    messages: [
-      {
-        role: 'system',
-        content: `Respond to the user's messages as best, accurately, convincingly, and as human-like as you can, keep it short and straight to the point. Maximum of 5 sentences. You can make it long if the users asks for it. You can also add bullets and numbers in a list in addition to the 5 sentences, but add them only if the user asks for it. You can try to call their name sometimes if you want, here's the user's name: ${
-          user.firstName || user.username
-        }. Also, if they ask if you know or who Zomer, Zomer Gregorio, or zomeru is (that's me by the way, who created this bot (Batibot, name of the bot)), you can try to respond this message instead: "${zomerInfo}", or if they ask if you know or who Hannah Julieta Cabalo, Hannah Julieta, Hannah Cabalo, or bonk is (That's my girlfriend by the way), you can respond this message instead: "${hannahInfo}", you can try to add your own response in addition to that.${
-          formattedMessages
-            ? ` Also, you can try to make your answer based on the user's recent messages and your response (as an assistant) to those recent messages (conversation history), if they did not get the answer they want and they ask again. Here are the 20 recent messages of the user, the most recent is always number 1:\n\n${formattedMessages}`
-            : ''
-        }`,
-      },
-      { role: 'user', content: prompt },
-    ],
+  return formattedMessages;
+};
+
+export const chatCompletion = async (user: User, prompt: string) => {
+  const formattedMessages = await findOrCreateUserAndGetRecentMessages(
+    user,
+    20
+  );
+
+  const gptResponse = await gptCreateChatCompletion({
+    userPrompt: prompt,
+    systemContent: chatCompletionSystemContent(user, formattedMessages),
   });
 
-  const defaultResponse =
-    'Sorry, something went wrong on our end. Please try again.';
+  await saveUserPrompt(
+    user.id,
+    prompt,
+    gptResponse ? gptResponse : defaultGPTResponse
+  );
 
-  if (
-    response.data.choices.length <= 0 ||
-    !response.data.choices[0]?.message?.content
-  ) {
-    // Save message to database
-    await supabase.from('messages').insert([
-      {
-        user: user.id,
-        message: prompt,
-        assistant_response: defaultResponse,
-      },
-    ]);
-    return defaultResponse;
+  if (!gptResponse) {
+    return defaultGPTResponse;
   }
 
-  const gptResponse = response.data.choices[0].message.content;
-
-  // Save message to database
-  await supabase.from('messages').insert([
-    {
-      user: user.id,
-      message: prompt,
-      assistant_response: gptResponse,
-    },
-  ]);
   return gptResponse;
+};
+
+export const imageGeneration = async (user: User, prompt: string) => {
+  try {
+    const recentMessages = await findOrCreateUserAndGetRecentMessages(user, 1);
+
+    const response = await openai.createImage({
+      prompt: imageGenerationPrompt(prompt, recentMessages),
+      n: 1,
+      size: '256x256',
+      response_format: 'url',
+    });
+
+    const imageUrl = response.data.data[0]?.url;
+    await saveUserPrompt(
+      user.id,
+      prompt,
+      imageUrl ? imageUrl : defaultGPTResponse
+    );
+
+    if (!imageUrl) {
+      return defaultGPTResponse;
+    }
+
+    return imageUrl;
+  } catch (error: any) {
+    if (error.response) {
+      console.log('error generating image data', error.response.data);
+    } else {
+      console.log('error generating image message', error.message);
+    }
+
+    return defaultGPTResponse;
+  }
 };
